@@ -1,5 +1,5 @@
 # bd-translate
-bioinformatic and data analysis power tool to convert and integrate data (i.e. join with steroids)
+bioinformatic and data analysis power tool to convert and integrate data (i.e. left outer join with steroids)
 
 ```
 Usage: translate [options] DICTIONARY 1 2 3 < TAB_FILE 
