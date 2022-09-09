@@ -5,20 +5,57 @@ use Getopt::Long;
 $,="\t";
 
 
-my $usage = "$0 [-i|ignore-missing-columns] [-s|split_separator] [-w|split_each_word] [-a|append] [-d [-g glue] [-j]] [-m glue] [-v|allow_missing_translations [-e VALUE ]] [-k|kill] [-n|invert-dictionary] [-f|key_field N] [-p|pass REGEXP] DICTIONARY 1 2 3 < tab_file\
-	-d	allow duplicated keys in DICTIONARY
-	-g	indicate the separator for multiple values of the same key in output
-	-m	if the dictionary file has more than 2 columns, the transaltion is multi column and the separator is glue
-	-k	kill untranslated rows
-	-b FILE print the killed rows of STDIN in FILE
-	-e	use VALUE as translation when a key si not present in dictionary
-	-j	join lyke out (when there duplicated translation for the same key generate multiple rows)
-	-p	ignore input rows matching REGEXP, use -p '^>' to skip the translation of fasta headers
-	-c	ignore case in the comparison with the dictionary
-	-w	translate each word
-	-r	put the added columns at the end of rows
-	-z	allow empty dictionary
+# TODO add tool general Description above Usage
+# TODO add option '-h show this message and exit'
+# TODO Fix better 'Option syntax: ..' # call it Option combos syntax?
+# put it above Options section
+# Option syntax: [-i|ignore-missing-columns] [-s|split_separator] [-w|split_each_word] [-a|append] [-d [-g glue] [-j]] [-m glue] [-v|allow_missing_translations [-e VALUE ]] [-k|kill] [-n|invert-dictionary] [-f|key_field N] [-p|pass REGEXP]
+# TODO substitute column indication 1 2 3 with..?
+#my $usage = "Usage: $0 [-i|ignore-missing-columns] [-s|split_separator] [-w|split_each_word] [-a|append] [-d [-g glue] [-j]] [-m glue] [-v|allow_missing_translations [-e VALUE ]] [-k|kill] [-n|invert-dictionary] [-f|key_field N] [-p|pass REGEXP] DICTIONARY 1 2 3 < tab_file\
+my $usage = "\nUsage: translate [options] DICTIONARY 1 2 3 < TAB_FILE \
+
+Options:
+	-f N		specify what is the column (by its number) of DICTIONARY that contains the keys to be translated in TAB_FILE [default is column 1]
+	-a		append translation: add new columns with translation on the right of the translated column (instead of substituting it)
+	-r		put the added columns at the end of all TAB_FILE columns
+	-i		ignore empty fields in column to be translated in TAB_FILE and keep the input row as is [NB: that row will have a different number of fields if used with -a option. Consider instead to suppress the row using -k]
+	-k		kill untranslated rows (because of KEY missing in DICTIONARY)
+	-d		allow duplicated keys in DICTIONARY
+	  -g GLUE	indicate the separator for multiple values of the same key in output (when there are duplicated translations for the SAME KEY, list them in the same row, separated by GLUE)
+	  -j		join like out (when there are duplicated translations for the SAME KEY, generate multiple rows clustered together, one for each translation)
+	-m GLUE		if the DICTIONARY file has more than 2 columns, the translation is multi-column and the separator is GLUE (different from -j because double tanslations are on the same row here) [default glue is ';']
+	-b FILE		print the killed rows of STDIN/TAB_FILE in FILE
+	-v		allow missing translations in the dictionary (print also rows of TAB_FILE whose value to be translated is not in the dictionary)
+	  -e VALUE	use VALUE as translation when a key is not present in dictionary [must be used together with -v]
+	-p REGEXP	ignore input rows matching REGEXP (in Perl syntax), e.g. use -p '^>' to skip the translation of FASTA headers
+	-c		case insensitive (ignore case in the comparison with the dictionary)
+	-w		translate each word (word = each string of letters, numbers and/or underscores ('_'). Words can be separated by spaces (' '), hyphens ('-'), dots('.'), tabs etc [NOT compatible with column indication nor with options -a, -k]
+	-s		split separator
+	-z		allow dictionary to be empty
+	-n 		invert columns of DICTIONARY (same as -f 2) [compatibile with -m]
+
+
 ";
+
+# -s instead of tabs, split terms on.. #right?
+#TODO: options: doubts:
+#-z also non existent DICTIONARY ok?
+#
+
+# old help:
+#Options:
+#	-d	allow duplicated keys in DICTIONARY
+#	-g	indicate the separator for multiple values of the same key in output
+#	-m	if the dictionary file has more than 2 columns, the transaltion is multi column and the separator is glue
+#	-k	kill untranslated rows
+#	-b FILE print the killed rows of STDIN in FILE
+#	-e	use VALUE as translation when a key si not present in dictionary
+#	-j	join lyke out (when there duplicated translation for the same key generate multiple rows)
+#	-p	ignore input rows matching REGEXP, use -p '^>' to skip the translation of fasta headers
+#	-c	ignore case in the comparison with the dictionary
+#	-w	translate each word
+#	-r	put the added columns at the end of rows
+#	-z	allow empty dictionary
 
 my $key_field = undef;
 my $ignore_missing_columns=0;
@@ -61,37 +98,46 @@ GetOptions (
 
 $SIG{__WARN__} = sub {die @_};
 
-die("-g option meaningless without -d option") if defined $glue  and !$duplicated_keys;
+die("ERROR: -g option is meaningless without -d option") if defined $glue  and !$duplicated_keys;
 
 $glue = ';' if not defined $glue;
 
 #$allow_missing_translations = 1 if $kill;
 
 my $filename = shift @ARGV;
+if ($filename =~ /.gz$/) {
+    open(FH, "zcat $filename|") or die("ERROR: Can't open file ($filename)");
+} elsif ($filename =~ /.xz$/) {
+    open(FH, "xzcat $filename|") or die("ERROR: Can't open file ($filename)");
+} else {
+    open(FH,$filename) or die("ERROR: Can't open file ($filename)");
+}
 
-open FH,$filename or die("Can't open file ($filename)");
-open KILLED,">$print_killed" or die("Can't open file ($print_killed)") if $print_killed;
+open KILLED,">$print_killed" or die("ERROR: Can't open file ($print_killed)") if $print_killed;
 
 my @columns=@ARGV;
 
-die("no column indication\n$usage") if scalar(@columns) == 0 and !$split_each_word; 
+die("ERROR: no column indication\n$usage") if scalar(@columns) == 0 and !$split_each_word;
 
 for(@columns){
-	die("invalid columns ($_)") if !m/^\d+$/;
+	die("ERROR: invalid columns ($_)") if !m/^\d+$/;
 	$_--;
 }
 
-die("-w option incompatible with column indication") if($split_each_word and scalar(@columns) > 0);
-die("-j option require -d and -a options and conflicts with -w") if $join_lyke_out and ($split_each_word or (!$duplicated_keys or !$append));
-die("-w option conflicts with -k") if ($split_each_word and $kill);
-die("-b|print_killed option require -k") if ($print_killed and not $kill);
-die("-e meaningless without -v") if defined($empty_key) and not $allow_missing_translations;
-die("-n meaningless with -f") if defined($key_field) and $invert_dictionary;
-die("-f require a parameter >=1") if defined($key_field) and $key_field < 1;
-die("-r require -a") if $append_at_the_R_of_rows and not $append;
-die("-r not compatible with -j") if $append_at_the_R_of_rows and $join_lyke_out;
+die("ERROR: -w option incompatible with column indication") if($split_each_word and scalar(@columns) > 0);
+die("ERROR: -j option requires -d and -a options and conflicts with -w") if $join_lyke_out and ($split_each_word or (!$duplicated_keys or !$append));
+die("ERROR: -w option conflicts with -k") if ($split_each_word and $kill);
+die("ERROR: -b|print_killed option require -k") if ($print_killed and not $kill);
+die("ERROR: -e meaningless without -v") if defined($empty_key) and not $allow_missing_translations;
+die("ERROR: -n meaningless with -f") if defined($key_field) and $invert_dictionary;
+die("ERROR: -f require a parameter >=1") if defined($key_field) and $key_field < 1;
+die("ERROR: -r require -a") if $append_at_the_R_of_rows and not $append;
+die("ERROR: -r not compatible with -j") if $append_at_the_R_of_rows and $join_lyke_out;
 
-$empty_key  =~ s/\\t/\t/g if defined($empty_key);
+if (!defined($multi_column_separator)) {
+    $multi_column_separator = "\t";
+}
+
 $key_field-- if defined($key_field);
 $key_field = 0 if !defined($key_field);
 
@@ -104,11 +150,11 @@ my $empty_map = 1;
 while(<FH>){
 	$empty_map = 0;
 	chomp;
-	
+
 	my $k = undef;
 	my $v = undef;
 	if($key_field == 0){
-		die("At least 2 columns required in dictionary file (".$filename.")") if !m/\t/;
+		die("ERROR: At least 2 columns required in dictionary file (".$filename.")") if !m/\t/;
 		m/([^\t]+)[\t](.*)/;
 		if(!$invert_dictionary){
 			$k = $1;
@@ -120,31 +166,29 @@ while(<FH>){
 		if(defined($multi_column_separator)){
 			$v =~ s/\t/$multi_column_separator/g;
 		}
-		die("Malformed input in dictionary ($_)") if not defined $v;
+		die("ERROR: Malformed input in dictionary ($_)") if not defined $v;
 		if(not defined $columns_added_by_translation){
-			my @F=split(/\t/, $v);
+			my @F=split(/\t/, $v, -1);
 			$columns_added_by_translation = scalar(@F);
 		}
 	}else{
-		my @F = split /\t/;
+		my @F = split(/\t/, $_, -1);
 		$k = splice @F, $key_field, 1;
-		#my $separator = "\t" if not defined($multi_column_separator); ## seems to my that this row is useless
-		$v = join( defined $multi_column_separator ? $multi_column_separator : "\t", @F);
+		$v = join( $multi_column_separator, @F);
 		if(defined($columns_added_by_translation)){
-			warn "The dictrionary file has rows with differet number of fields." if scalar @F != $columns_added_by_translation;
+			warn "WARNING: The dictionary file has rows with different number of fields." if scalar @F != $columns_added_by_translation;
 		}
 		$columns_added_by_translation = scalar(@F) if not defined $columns_added_by_translation;
-
 	}
 
 	$k = uc($k) if $ignore_case;
 	if(not defined($k)){
-		die("Malformed input in dictionary ($_)");
+		die("ERROR: Malformed input in dictionary ($_)");
 	}
 
 	if(defined $hash{$k}){
 		if(!$duplicated_keys){
-			die("Duplicated key in dictionary ($k)");
+			die("ERROR: Duplicated key in dictionary ($k)");
 		}else{
 			if($join_lyke_out){
 				if(ref($hash{$k}) eq 'ARRAY'){
@@ -178,8 +222,12 @@ if($empty_map){
 }
 
 if($columns_added_by_translation > 1){
-	$columns_added_by_translation--;
-	$empty_key = "\t" x $columns_added_by_translation if $allow_missing_translations and not defined $empty_key;
+	if(not defined $empty_key){
+		$empty_key = "\t" x ($columns_added_by_translation-1) if $allow_missing_translations and not defined $empty_key;
+	}else{
+		$empty_key = "\t$empty_key" x $columns_added_by_translation if $allow_missing_translations;
+		$empty_key =~ s/^\t//;
+	}
 }else{
 	$empty_key = "" if not defined $empty_key;
 }
@@ -189,12 +237,12 @@ if($columns_added_by_translation > 1){
 my $warning=0;
 
 while(<STDIN>){
-	
+
 	if(defined $skip_input_regexp and m/$skip_input_regexp/){
 		print;
 		next;
 	}
-	
+
 	if(!$split_each_word){
 		chomp;
 		my @F = split /$split_separator/;
@@ -219,7 +267,7 @@ while(<STDIN>){
 							# e non join_lyke_out e solo la traduzione negli altri casi)
 				}
 			}else{
-				die("column $_+1 not defined in standard input (-i to ignore)") if !$ignore_missing_columns;
+				die("ERROR: column $_+1 not defined in standard input (-i to ignore)") if !$ignore_missing_columns;
 				if(!$warning){
 					print STDERR "WARNING: $0, column not defined\n";
 					$warning=1;
@@ -231,7 +279,8 @@ while(<STDIN>){
 				print @F;
 				print "\n";
 			}else{
-				die("only one column allowed when join lyke output enabled") if scalar(@columns) > 1;
+				die("ERROR: only one column is allowed when using option '-j' (used to gather multiple rows in output, each with a translation for the same key)") if scalar(@columns) > 1;
+				# original message: "only one column allowed when join like output enabled"
 				my $c = $columns[0];
 				my $a = $G[$c];
 				my $val=$F[$c]->[1];
@@ -255,7 +304,7 @@ while(<STDIN>){
 					print KILLED @F;
 					print KILLED "\n";
 				}else{ 
-					die("only one column allowed when join lyke output enabled") if scalar(@columns) > 1;
+					die("ERROR: only one column is allowed when using option '-j' (used to gather multiple rows in output, each with a translation for the same key)") if scalar(@columns) > 1;
 					my $c = $columns[0];
 					my $a = $G[$c];
 					my $val=$F[$c]->[1];
@@ -296,11 +345,15 @@ sub translate
 	}
 	if(!defined($b)){
 		if($allow_missing_translations){
-			if(defined($empty_key)){
-				$b=$empty_key;
+			if(!$split_each_word){
+				if(defined($empty_key)){
+					$b=$empty_key
+				}
+			}else{
+				$b=$a
 			}
 		}elsif(not $kill){
-			warn "missing translation for key ($a)\n" if !$allow_missing_translations;
+			warn "WARNING: missing translation for key ($a)\n" if !$allow_missing_translations;
 		}
 	}
 	if(defined($b)){
@@ -310,7 +363,7 @@ sub translate
 			$a = $b;
 		}
 	}
-	
+
 	my @tmp=($a, defined($b));
 	return \@tmp;
 }
