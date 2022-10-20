@@ -1,14 +1,17 @@
 # bd-translate
 bioinformatic and data analysis power tool to convert and integrate data (i.e. left outer join with steroids)
 
+
+### Usage: 
 ```
-Usage: translate [options] DICTIONARY 1 2 3 < TAB_FILE 
+Syntax:                 translate [options] DICTIONARY 1 2 3 < TAB_FILE 
 
   - DICTIONARY          tab-separated file with any number of columns, whose first is set as key by default
   - 1 2 3 (...)         columns (of the TAB_FILE) that we want to translate. Can be more than 3.
   - TAB_FILE            tab-separated file with any number of columns, among which those that we want to translate whenever the key is matched
-        
-Options:
+```   
+### Options:
+```
         -f N            specify what is the column (by its number) of DICTIONARY that contains the keys to be translated in TAB_FILE [default is column 1]
         -a              append translation: add new columns with translation on the right of the translated column (instead of substituting it)
         -r              put the added columns at the end of all TAB_FILE columns
@@ -16,7 +19,7 @@ Options:
         -k              kill untranslated rows (because of KEY missing in DICTIONARY)
         -d              allow duplicated keys in DICTIONARY
           -g GLUE       indicate the separator for multiple values of the same key in output (when there are duplicated translations for the SAME KEY, list them in the same row, separated by GLUE)
-          -j            join like out (when there are duplicated translations for the SAME KEY, generate multiple rows clustered together, one for each translation)
+          -j            join like out (when there are duplicated translations for the SAME KEY, generate multiple rows clustered together, one for each translation). -j option does not work if you are translating more than one column.
         -m GLUE         if the DICTIONARY file has more than 2 columns, the translation is multi-column and the separator is GLUE (different from -j because double tanslations are on the same row here) [default glue is ';']
         -b FILE         print the killed rows of STDIN/TAB_FILE in FILE
         -v              allow missing translations in the dictionary (print also rows of TAB_FILE whose value to be translated is not in the dictionary)
