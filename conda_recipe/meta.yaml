@@ -1,0 +1,19 @@
+{% set name = "translate" %}
+{% set version = "1.1" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source: 
+  path: ../src
+
+requirements:
+  host:
+    - perl
+  run:
+    - perl
+
+about:
+  home: https://github.com/bidauxpoto/bd-translate
+  summary: Translate
