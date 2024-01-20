@@ -1,5 +1,12 @@
 # bd-translate
-bioinformatic and data analysis power tool to convert and integrate data (i.e. left outer join with steroids)
+
+
+### Installation using conda:
+```conda install -c molinerislab translate```
+
+
+### Description:
+Bioinformatic and data analysis power tool to convert and integrate data (i.e. left outer join with steroids)
 
 
 ### Usage: 
@@ -10,6 +17,8 @@ Syntax:                 translate [options] DICTIONARY 1 2 3 < TAB_FILE
   - 1 2 3 (...)         columns (of the TAB_FILE) that we want to translate. Can be more than 3.
   - TAB_FILE            tab-separated file with any number of columns, among which those that we want to translate whenever the key is matched
 ```   
+
+
 ### Options:
 ```
   -f N            specify what is the column (by its number) of DICTIONARY that contains the keys to be translated in TAB_FILE [default is column 1]
